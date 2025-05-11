@@ -35,9 +35,9 @@ inductive t where
 /- define the evaluation relation: in Lean we incode it as an  *inductive prooposition* -/
 
 inductive t.EvaluatesTo : t → t → Prop
-| EvaluatesToTrue: t.EvaluatesTo (.ite .True t₂ t₃) t₂
-| EvaluatesToFalse: t.EvaluatesTo (.ite .False t₂ t₃) t₃
-| EvaluatesToIf (h : t.EvaluatesTo c c') : t.EvaluatesTo (.ite c l r) (.ite c' l r)
+| EvaluatesToTrue: t.EvaluatesTo (.ite .True l r) l
+| EvaluatesToFalse: t.EvaluatesTo (.ite .False l r) r
+| EvaluatesToIf (h : t.EvaluatesTo cd cd') : t.EvaluatesTo (.ite cd l r) (.ite cd' l r)
 
 open t
 
@@ -87,26 +87,26 @@ inductive nv : t' → Prop where
   | succ n : nv n → nv (t'.succ n)
 
 inductive t'.EvaluatesTo : t' → t' → Prop
-| -- ite true t₂ t₃ → t₂
-  EvaluatesToTrue {t₁ t₁' : t'} : t'.EvaluatesTo (True.ite t₁ t₁') t₁
-| -- ite false t₂ t₃ → t₃
-  EvaluatesToFalse {t₁ t₁' : t'} : t'.EvaluatesTo (False.ite t₁ t₁') t₁'
-| -- (c → c') → (ite c l r → ite c' l r)
-  EvaluatesToIf (h : t'.EvaluatesTo c c') : t'.EvaluatesTo (c.ite l r) (c'.ite l r)
-| -- (t₁ → t₁') → (succ t₁ → succ t₂)
-  EvaluatesToSucc {t₁ t₁' : t'} (h : EvaluatesTo t₁ t₁') : (EvaluatesTo (t'.succ t₁) (t'.succ t₁'))
+| -- ite true l r → l
+  EvaluatesToTrue {l r : t'} : t'.EvaluatesTo (True.ite l r) l
+| -- ite false l r → r
+  EvaluatesToFalse {l r : t'} : t'.EvaluatesTo (False.ite l r) r
+| -- (cd → cd') → (ite cd l r → ite cd' l r)
+  EvaluatesToIf (h : t'.EvaluatesTo cd cd') : t'.EvaluatesTo (cd.ite l r) (cd'.ite l r)
+| -- (v → v') → (succ v → succ v')
+  EvaluatesToSucc {v v' : t'} (h : EvaluatesTo v v') : (EvaluatesTo (t'.succ v) (t'.succ v'))
 | -- pred 0 = 0
   EvaluatesToZero : t'.EvaluatesTo (t'.pred t'.zero) (t'.zero)
 | -- pred (succ nv) → nv
-  EvaluatesToPredSucc (h : nv v₁) : t'.EvaluatesTo (t'.pred (t'.succ v₁))  (v₁)
-| -- (t₁ → t₁') → (pred t₁ → pred t₂)
-  EvaluatesToPred (h : t'.EvaluatesTo t₁ t₁') : t'.EvaluatesTo (t'.pred t₁) (t'.pred t₁')
+  EvaluatesToPredSucc (h : nv v) : t'.EvaluatesTo (t'.pred (t'.succ v))  (v)
+| -- (v → v') → (pred v → pred v')
+  EvaluatesToPred (h : t'.EvaluatesTo v v') : t'.EvaluatesTo (t'.pred v) (t'.pred v')
 | -- iszero 0 → true
   EvaluatesToIsZeroZero : t'.EvaluatesTo (t'.iszero t'.zero) (t'.True)
 | -- iszero (succ nv) → false
-  EvaluatesToIsZeroSucc (h : nv v₁) : t'.EvaluatesTo (t'.iszero (t'.succ v₁)) (t'.False)
-| -- (t₁ → t₁') → (iszero t₁ → iszero t₂)
-  EvaluatesToIsZero (h : t'.EvaluatesTo t₁ t₁') : t'.EvaluatesTo (t'.iszero t₁) (t'.iszero t₁')
+  EvaluatesToIsZeroSucc (h : nv v) : t'.EvaluatesTo (t'.iszero (t'.succ v)) (t'.False)
+| -- (tt → tt') → (iszero tt → iszero tt')
+  EvaluatesToIsZero (h : t'.EvaluatesTo tt tt') : t'.EvaluatesTo (t'.iszero tt) (t'.iszero tt')
 
 -- Q: what's the diff between doing cases on an inductive type vs. induction
 
@@ -198,56 +198,81 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
   -- we use induction on the derivation rule hab
   induction hab generalizing c -- same as "revert c"
   · -- a [EvaluatesToTrue]→ b
-    -- i.e., a = ite True t₁ t₁'
-    case EvaluatesToTrue t₁ t₁' =>
+    -- i.e., a = ite True l r
+    case EvaluatesToTrue l r =>
     cases hac
     · -- a [EvaluatesToTrue]→ c
-      case EvaluatesToTrue => rfl
+      case EvaluatesToTrue => rfl -- same rule
     · -- a [EvaluatesToIf]→ c
-      -- i.e., given (h : t'.EvaluatesTo True c') then t'.EvaluatesTo (ite True t₁ t₁') (ite c' t₁ t₁')
-      -- with a = ite True t₁ t₁' according to the first case and c = ite c' t₁ t₂
+      -- i.e., given (h : t'.EvaluatesTo True cd') then t'.EvaluatesTo (ite True l r) (ite cd' l r)
+      -- with a = ite True l r according to the first case and c = ite cd' l r
       case EvaluatesToIf c hTrueEvalTo =>
         -- does not exist, as per the first inversion lemma:
         -- we show that the hypotheses are contradictory (showing that the
         -- contrary of NotTrueEvalTo is absurd)
         exact absurd hTrueEvalTo (NotTrueEvalTo _)
   · -- a [EvaluatesToFalse]→ b
-    -- i.e., a = ite False t₁ t₁'
+    -- i.e., a = ite False l r
     -- this case works exactly as the previous one
-    case EvaluatesToFalse t₁ t₁' =>
+    case EvaluatesToFalse l r =>
     cases hac
     · -- a [EvaluatesToFalse]→ c
-      case EvaluatesToFalse => rfl
+      case EvaluatesToFalse => rfl -- same rule
     · -- a [EvaluatesToIf]→ c
-      -- i.e., given (h : t'.EvaluatesTo False c') then t'.EvaluatesTo (ite False t₁ t₁') (ite c' t₁ t₁')
-      -- with a = ite False t₁ t₁' according to the first case and c = ite c' t₁ t₂
+      -- i.e., given (h : t'.EvaluatesTo False cd') then t'.EvaluatesTo (ite False l r) (ite cd' l r)
+      -- with a = ite False l r according to the first case and c = ite cd' l r
       case EvaluatesToIf c hTrueEvalTo =>
         -- does not exist, as per the second inversion lemma:
         -- we show that the hypotheses are contradictory (showing that the
         -- contrary of NotFalseEvalTo is absurd)
         exact absurd hTrueEvalTo (NotFalseEvalTo _)
   · -- a [EvaluatesToIf]→ b
-    case EvaluatesToIf cond₁ cond₂ l r hCondEvalToCond ihcond =>
+    case EvaluatesToIf cd cd' l r hCdEvalToCd ihcond =>
     -- the inductive hypothesis applies the theorem statement
     -- to the subterm involved in the hypothesis this evaluation
     -- rules relies on
     cases hac
     · -- a [EvaluatesToTrue]→ c
       case EvaluatesToTrue => -- absurd as above
-      exact absurd hCondEvalToCond (NotTrueEvalTo _)
+      exact absurd hCdEvalToCd (NotTrueEvalTo _)
     · -- a [EvaluatesToFalse]→ c
       case EvaluatesToFalse => -- absurd as above
-      exact absurd hCondEvalToCond (NotFalseEvalTo _)
+      exact absurd hCdEvalToCd (NotFalseEvalTo _)
     · -- a [EvaluatesToIf]→ c
-      -- i.e., given a = ite cond₁ l r and hab : given (cond₁ → cond₂) then (ite cond₁ l r) → (cond₂ l r)
+      -- i.e., given a = ite cd l r and hab : given (cd → cd') then (ite cd l r) → (cd' l r)
       -- we suppose
-      -- hac : given (cond₁ → cond') then (ite cond₁ l r) → (cond' l r)
+      -- hac : given (cd → cd'') then (ite cd l r) → (cd'' l r)
       -- and thus the goal b = c becomes:
       -- (cond₂ l r) = (cond' l r)
-      case EvaluatesToIf cond' hcontEvalToCond =>
+      case EvaluatesToIf cd'' hCdEvalToCd =>
       -- we exploit the congruence in functions and applications and construct
-      exact congrFun (congrFun (congrArg t'.ite (ihcond cond' hcontEvalToCond)) l) r
+      exact congrFun (congrFun (congrArg t'.ite (ihcond cd'' hCdEvalToCd)) l) r
   · -- a [EvaluatesToSucc]→ b
-    case EvaluatesToSucc t₁ t₁' ht₁EvalTot₁' ih =>
-
-    sorry
+    -- i.e. a = succ v
+    case EvaluatesToSucc v v' hvEvalTov' ih =>
+    -- i.e. given (v → v') then (succ v) → (succ v')
+    -- with a = succ v and b = succ v'
+    cases hac
+    · -- i.e., given a = succ v and hab : given (v → v') then (succ v) → (succ v')
+      -- we suppose
+      -- hac : given (v → v'') then (succ v) → (succ v'')
+      -- and the goal b = c becomes:
+      -- succ v' = succ v''
+      case EvaluatesToSucc v'' hvEvalTov'' =>
+      exact congrArg t'.succ (ih v'' hvEvalTov'')
+  · -- a [EvaluatesToZero]→ b
+    -- i.e. a = zero
+    case EvaluatesToZero =>
+    cases hac
+    · -- given a = zero, if this rule applies to it thus hab = hac
+      case EvaluatesToZero => rfl
+    · -- we now suppose a [EvaluatesToPred]→ b
+      -- i.e., given (v → v') then (pred v) → (pred v')
+      -- assuming that a = pred v = zero
+      -- this rule requires us to show zero → v', which is absurd
+      case EvaluatesToPred v' hZeroEvalTo => exact absurd hZeroEvalTo (NotZeroEvalTo _)
+  · case EvaluatesToPredSucc => sorry
+  · case EvaluatesToPred => sorry
+  · case EvaluatesToIsZeroZero => sorry
+  · case EvaluatesToIsZeroSucc => sorry
+  · case EvaluatesToIsZero => sorry
