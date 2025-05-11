@@ -44,7 +44,7 @@ open t
 /-
   theorem 3.5.4: determinacy of one-step evaluation
     if t → t' and t → t'' then t' = t''
-  (note that we implement "→" as EvaluatesTo)
+  (note that we represent "→" as EvaluatesTo)
 -/
 theorem OneStepDeterminacy (a b c : t) (hab : t.EvaluatesTo a b) (hac : t.EvaluatesTo a c) : b = c := by
   revert c -- need to generalize c to be able to use it afterwards in the inductive cases
@@ -92,7 +92,7 @@ inductive t'.EvaluatesTo : t' → t' → Prop
 | -- ite false t₂ t₃ → t₃
   EvaluatesToFalse {t₁ t₁' : t'} : t'.EvaluatesTo (False.ite t₁ t₁') t₁'
 | -- (c → c') → (ite c l r → ite c' l r)
-  EvaluatesToIf {t₁ t₁' : t'} (h : t'.EvaluatesTo c c') : t'.EvaluatesTo (c.ite l r) (c'.ite l r)
+  EvaluatesToIf (h : t'.EvaluatesTo c c') : t'.EvaluatesTo (c.ite l r) (c'.ite l r)
 | -- (t₁ → t₁') → (succ t₁ → succ t₂)
   EvaluatesToSucc {t₁ t₁' : t'} (h : EvaluatesTo t₁ t₁') : (EvaluatesTo (t'.succ t₁) (t'.succ t₁'))
 | -- pred 0 = 0
@@ -195,162 +195,59 @@ theorem NotNvEvalTo (v t : t') (n : nv v) : ¬ t'.EvaluatesTo v t := by
 
 
 theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.EvaluatesTo a c) : b = c := by
-  -- this time we use induction on the structure of a
-  revert b c
-  induction a
-  · -- if a = t'.True only [EvaluatesToTrue] is a valid evaluation rule
-    case True =>
-      intros b c hb hc
-      cases hb
-  · -- if a = t'.False only [EvaluatesToFalse] is a valid evaluation rule
-    case False =>
-      intros b c hb hc
-      cases hb
-  · -- suppose a = ite a1 a2 a3
-    -- then
-    -- hab := (ite a1 a2 a3).EvaluatesTo b
-    -- hac := (ite a1 a2 a3).EvaluatesTo c
-    case ite a1 a2 a3 ih1 ih2 ih3 =>
-      intros b c hb hc
-      · cases hb
-        · case EvaluatesToTrue =>
-          cases hc
-          · -- a [EvaluatesToTrue] → b and
-            -- a [EvaluatesToTrue] → c
-            case EvaluatesToTrue => rfl
-          · -- a [EvaluatesToTrue] → b and
-            -- a [EvaluatesToIf] → c,
-            -- this is absurd  since a = ite true a2 a3 can only evaluate by
-            -- EvaluatesToTrue
-            case EvaluatesToIf c' hTrueEvalTo => cases hTrueEvalTo
-        · case EvaluatesToFalse =>
-          cases hc
-          · case EvaluatesToFalse => rfl
-          · case EvaluatesToIf c' hFalseEvalTo => cases hFalseEvalTo -- absurd
-        · case EvaluatesToIf c' t₁ t₁' ha1Toc1 =>
-          cases hc
-          · case EvaluatesToTrue => cases ha1Toc1 -- contradiction
-          · case EvaluatesToFalse => cases ha1Toc1 -- contradictio
-          · case EvaluatesToIf c' t₁ t₁' ha1Toc' =>
-            simp only [t'.ite.injEq, and_self, and_true]
-            -- we can specialize ih1 with the hypotheses haToc1 and haToc'
-            apply ih1
-            · exact ha1Toc1
-            · exact ha1Toc'
-  · -- suppose a = zero
-    case zero =>
-    intros b c hb hc
-    cases hb -- there is only one rule that can evaluate .zero
-  · -- suppose a = succ s
-    case succ s ih =>
-    intros b c hb hc
-    cases hb
-    · case EvaluatesToSucc t₁ hsTot₁ =>
-      cases hc
-      · case EvaluatesToSucc t₁' hsTot₁' =>
-        simp only [t'.succ.injEq]
-        apply ih
-        · exact hsTot₁
-        · exact hsTot₁'
-  · -- suppose a = pred s
-    case pred s ih =>
-    intros b c hb hc
-    cases hb
-    · case EvaluatesToZero =>
-      cases hc
-      · case EvaluatesToZero => rfl -- same derivation rule
-      · case EvaluatesToPred t₁' hzeroTot₁' => cases hzeroTot₁' -- absurd
-    · case EvaluatesToPredSucc b =>
-      induction b
-      · case zero =>
-        cases hc
-        · case EvaluatesToPredSucc => rfl
-        · case EvaluatesToPred t₁' h =>
-          cases h
-          · case EvaluatesToSucc t₁' h =>
-            cases h
-      · case succ b ihb =>
-        cases hc
-        · case EvaluatesToPredSucc => rfl
-        · case EvaluatesToPred t₁' h =>
+  -- we use induction on the derivation rule hab
+  induction hab generalizing c -- same as "revert c"
+  · -- a [EvaluatesToTrue]→ b
+    -- i.e., a = ite True t₁ t₁'
+    case EvaluatesToTrue t₁ t₁' =>
+    cases hac
+    · -- a [EvaluatesToTrue]→ c
+      case EvaluatesToTrue => rfl
+    · -- a [EvaluatesToIf]→ c
+      -- i.e., given (h : t'.EvaluatesTo True c') then t'.EvaluatesTo (ite True t₁ t₁') (ite c' t₁ t₁')
+      -- with a = ite True t₁ t₁' according to the first case and c = ite c' t₁ t₂
+      case EvaluatesToIf c hTrueEvalTo =>
+        -- does not exist, as per the first inversion lemma:
+        -- we show that the hypotheses are contradictory (showing that the
+        -- contrary of NotTrueEvalTo is absurd)
+        exact absurd hTrueEvalTo (NotTrueEvalTo _)
+  · -- a [EvaluatesToFalse]→ b
+    -- i.e., a = ite False t₁ t₁'
+    -- this case works exactly as the previous one
+    case EvaluatesToFalse t₁ t₁' =>
+    cases hac
+    · -- a [EvaluatesToFalse]→ c
+      case EvaluatesToFalse => rfl
+    · -- a [EvaluatesToIf]→ c
+      -- i.e., given (h : t'.EvaluatesTo False c') then t'.EvaluatesTo (ite False t₁ t₁') (ite c' t₁ t₁')
+      -- with a = ite False t₁ t₁' according to the first case and c = ite c' t₁ t₂
+      case EvaluatesToIf c hTrueEvalTo =>
+        -- does not exist, as per the second inversion lemma:
+        -- we show that the hypotheses are contradictory (showing that the
+        -- contrary of NotFalseEvalTo is absurd)
+        exact absurd hTrueEvalTo (NotFalseEvalTo _)
+  · -- a [EvaluatesToIf]→ b
+    case EvaluatesToIf cond₁ cond₂ l r hCondEvalToCond ihcond =>
+    -- the inductive hypothesis applies the theorem statement
+    -- to the subterm involved in the hypothesis this evaluation
+    -- rules relies on
+    cases hac
+    · -- a [EvaluatesToTrue]→ c
+      case EvaluatesToTrue => -- absurd as above
+      exact absurd hCondEvalToCond (NotTrueEvalTo _)
+    · -- a [EvaluatesToFalse]→ c
+      case EvaluatesToFalse => -- absurd as above
+      exact absurd hCondEvalToCond (NotFalseEvalTo _)
+    · -- a [EvaluatesToIf]→ c
+      -- i.e., given a = ite cond₁ l r and hab : given (cond₁ → cond₂) then (ite cond₁ l r) → (cond₂ l r)
+      -- we suppose
+      -- hac : given (cond₁ → cond') then (ite cond₁ l r) → (cond' l r)
+      -- and thus the goal b = c becomes:
+      -- (cond₂ l r) = (cond' l r)
+      case EvaluatesToIf cond' hcontEvalToCond =>
+      -- we exploit the congruence in functions and applications and construct
+      exact congrFun (congrFun (congrArg t'.ite (ihcond cond' hcontEvalToCond)) l) r
+  · -- a [EvaluatesToSucc]→ b
+    case EvaluatesToSucc t₁ t₁' ht₁EvalTot₁' ih =>
 
-          cases h
-          · case EvaluatesToSucc t₁' h =>
-            cases h
-            · case EvaluatesToSucc t₁' h =>
-
-
-
-
-      sorry
-    · case EvaluatesToPred t₁' hsTot₁' =>
-      cases hc
-      · case EvaluatesToZero => cases hsTot₁'
-      · case EvaluatesToPredSucc =>
-
-        sorry
-      · case EvaluatesToPred t₁' h =>
-        simp
-        apply ih
-        · exact hsTot₁'
-        · exact h
-  · -- suppose a = iszero s
-    case iszero s ih =>
-    intros b c hb hc
-    cases hb
-    · case EvaluatesToIsZeroZero =>
-      cases hc
-      · case EvaluatesToIsZeroZero => rfl
-      · case EvaluatesToIsZero t₁' h => cases h -- absurd
-    · case EvaluatesToIsZeroSucc v₁ h =>
-
-      cases hc
-      · case EvaluatesToIsZeroSucc => rfl
-      · case EvaluatesToIsZero t₁' h =>
-        simp [h]
-
-
-        sorry
-    · case EvaluatesToIsZero t₁' h =>
-      cases hc
-      · case EvaluatesToIsZeroZero => sorry
-      · case EvaluatesToIsZeroSucc => sorry
-      · case EvaluatesToIsZero t₁'' hsTot₁'' =>
-        simp
-        apply ih
-        · exact h
-        · exact hsTot₁''
-
-
-
-
-
-
-
-
-/-
-/-- Untyped Bools and Nats -/
-inductive t' where
-  | True : t'
-  | False : t'
-  | ite : t' → t' → t' → t'
-  | zero : t'
-  | succ : t' → t'
-  | pred : t' → t'
-  | isZero : t' → t'
-def valB (b : t') :=
-  match b with
-  | t'.True => true
-  | t'.False => false
-  | t'.ite c a b => if valB c then valB a else valB b
-  | _ => _
-def valN (n : t') : Nat :=
-  match n with
-  | t'.True => valB n
-  | t'.False => valB n
-  | t'.ite c a b => valB n
-  | t'.zero => val: t'
-  | t'.succ => val: t' → t'
-  | t'.pred => val: t' → t'
-  | t'.isZero => val: t' → t'
--/
+    sorry
