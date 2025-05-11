@@ -248,10 +248,9 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
       -- we exploit the congruence in functions and applications and construct
       exact congrFun (congrFun (congrArg t'.ite (ihcond cd'' hCdEvalToCd)) l) r
   · -- a [EvaluatesToSucc]→ b
-    -- i.e. a = succ v
-    case EvaluatesToSucc v v' hvEvalTov' ih =>
-    -- i.e. given (v → v') then (succ v) → (succ v')
+    -- i.e. a = succ v and hab : given (v → v') then (succ v) → (succ v')
     -- with a = succ v and b = succ v'
+    case EvaluatesToSucc v v' hvEvalTov' ih =>
     cases hac
     · -- i.e., given a = succ v and hab : given (v → v') then (succ v) → (succ v')
       -- we suppose
@@ -267,12 +266,105 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
     · -- given a = zero, if this rule applies to it thus hab = hac
       case EvaluatesToZero => rfl
     · -- we now suppose a [EvaluatesToPred]→ b
-      -- i.e., given (v → v') then (pred v) → (pred v')
+      -- i.e. hab : given (v → v') then (pred v) → (pred v')
       -- assuming that a = pred v = zero
       -- this rule requires us to show zero → v', which is absurd
-      case EvaluatesToPred v' hZeroEvalTo => exact absurd hZeroEvalTo (NotZeroEvalTo _)
-  · case EvaluatesToPredSucc => sorry
-  · case EvaluatesToPred => sorry
-  · case EvaluatesToIsZeroZero => sorry
-  · case EvaluatesToIsZeroSucc => sorry
-  · case EvaluatesToIsZero => sorry
+      case EvaluatesToPred v' hZeroEvalTo =>
+      exact absurd hZeroEvalTo (NotZeroEvalTo _)
+  · -- a [EvaluatesToPredSucc] → b
+    -- i.e. hab : a = pred (succ v) and hab : pred (succ v) → v given that v has a numerical value nv v
+    -- and thus b = v
+    case EvaluatesToPredSucc v hNv =>
+    cases hac
+    · case EvaluatesToPredSucc => rfl
+    · -- a [EvaluatesToPred]→ c
+      -- i.e. hac : given ((succ v) → v') then (pred (succ v)) → (pred v')
+      -- and thus b = c becomes
+      -- v = pred v'
+      case EvaluatesToPred v' hvEvalTov' =>
+      -- we construct the numerical value of succ v
+      -- using the constructors of nv, v and its numerical value
+      have hNv' : nv (t'.succ v) := nv.succ v hNv
+      -- and we exploit the fact that the numerical value can not be evaluated to anything
+      exact absurd hvEvalTov' (NotNvEvalTo _ _ hNv')
+  · -- a [EvaluatesToPred] → b
+    -- i.e. hab : a = pred v and hab : given (v → v') then (pred v) → (pred v')
+    case EvaluatesToPred v v' hvEvalTov' ih =>
+    cases hac
+    · -- a [EvaluatesToZero]→ c
+      -- i.e. hac : (pred zero) → zero in hab, which would rely on zero → v', which is absurd
+      -- as zero does not evaluate to anything
+      case EvaluatesToZero =>
+      exact absurd hvEvalTov' (NotZeroEvalTo v')
+    · -- a [EvaluatesToPredSucc]→ c
+      -- i.e. hac : a = (pred (succ _)) and (pred (succ _)) → c,
+      -- which becomes succ c → v' in the hypotheses hab introduces
+      -- the goal b = c becomes
+      -- pred v' = c
+      case EvaluatesToPredSucc hNv'' =>
+      -- we use the constructor of nv to
+      have hNv'' : nv (t'.succ c) := nv.succ c hNv''
+      -- no evaluation rule applies to numerical values, i.e., hvEvalTov' yields an absurd
+      -- given the construction of hNV''
+      exact absurd hvEvalTov' (NotNvEvalTo _ _ hNv'')
+    · -- a [EvaluatesToPred]→ c
+      -- i.e. hac : a = (pred v) and (pred v) → (pred v''),
+      -- which relies on v → v''
+      -- the goal b = c becomes
+      -- pred v' = pred v'', we use the inductive hypothesis
+      case EvaluatesToPred v'' hvEvalTov'' =>
+      exact congrArg t'.pred (ih v'' hvEvalTov'')
+  · -- a [EvaluatesToIsZeroZero]→ b
+    -- i.e. hab : (iszero zero) → True and thus a = iszero zero, b = True
+    case EvaluatesToIsZeroZero =>
+    cases hac
+    · case EvaluatesToIsZeroZero => rfl
+    · -- a [EvaluatesToIsZero]→ c
+      -- i.e. hac : given tt → tt' then iszero tt → iszero tt'
+      -- however, a = iszero zero, and thus hac becomes:
+      -- given zero → tt then iszero zero → iszero tt', which is absurd
+      -- according to the inversion lemmas.
+      case EvaluatesToIsZero tt' hZeroEvalTott' =>
+      exact absurd hZeroEvalTott' (NotZeroEvalTo tt')
+  · -- a [EvaluatesToIsZeroSucc]→ b
+    -- i.e. given a v with numerical value nv v, then iszero (succ v) → false
+    -- with a = iszero (succ v) and b = false
+    case EvaluatesToIsZeroSucc v hNv =>
+    cases hac
+    · case EvaluatesToIsZeroSucc => rfl
+    · -- a [EvaluatesToIsZero]→ c
+      -- i.e. hac : given (succ v) → v'' then (iszero (succ v)) → (iszero v'') remembering that a = iszero (succ v) from hab
+      -- the goal b = c thus becomes
+      -- false = iszero v''
+      case EvaluatesToIsZero v'' hvsuccEvalTov'' =>
+      -- we construct the numerical value of succ v
+      have hNvSucc : nv (t'.succ v) := nv.succ v hNv
+      -- and we show that the derivation (succ v) → v'' is absurd, since
+      exact absurd hvsuccEvalTov'' (NotNvEvalTo _ _ hNvSucc)
+  · -- a [EvaluatesToIsZero]→ b
+    -- i.e. hab : given tt → tt' then (iszero tt) → (iszero tt')
+    -- with a = iszero tt and b = iszero tt'
+    case EvaluatesToIsZero tt tt' httEvalTott' ih =>
+    cases hac
+    · -- a [EvaluatesToIsZeroZero]→ c
+      -- i.e. hac : (iszero zero) → true however, a = iszero tt from hab,
+      -- and if a = iszero zero in hab we would have zero → tt' in httEvalTott', which is absurd
+      -- since zero can't evaluate to tt'
+      case EvaluatesToIsZeroZero =>
+      exact absurd httEvalTott' (NotZeroEvalTo tt')
+    · -- a [EvaluatesToIsZeroSucc]→ c
+      -- i.e. hac : given a numerical value nv v, then (iszero (succ v)) → false
+      -- with a = iszero (succ v). in hab, this would require iszero (succ v) → iszero tt'
+      -- and in particular succ v → tt'
+      case EvaluatesToIsZeroSucc v hNv =>
+      -- we construct the numerical value for succ v
+      have hNvSucc : nv (t'.succ v) := nv.succ v hNv
+      -- hypothesis httEvalTott' is absurd, since it supposes succ v → tt'
+      exact absurd httEvalTott' (NotNvEvalTo _ _ hNvSucc)
+    · -- a [EvaluatesToIsZero]→ c
+      -- i.e. given tt → tt'' then (iszero tt) → (iszero tt'')
+      -- with hac : a = iszero tt and c = iszero tt''
+      -- the goal b = c thus becomes
+      -- iszero tt' = iszero tt'', we apply the inductive hypothesis
+      case EvaluatesToIsZero tt'' httEvalTott' =>
+      exact congrArg t'.iszero (ih tt'' httEvalTott')
