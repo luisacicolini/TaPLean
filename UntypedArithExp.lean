@@ -368,3 +368,26 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
       -- iszero tt' = iszero tt'', we apply the inductive hypothesis
       case EvaluatesToIsZero tt'' httEvalTott' =>
       exact congrArg t'.iszero (ih tt'' httEvalTott')
+
+/- def 3.5.6 A term t is in normal form if no evaluation rule applies to it -/
+def NormalForm (tt : t') := ¬ ∃ tt', t'.EvaluatesTo tt tt'
+
+/- theorem 3.5.7 : Every value is in normal form -/
+theorem ValueIsInNF (v : t') (h : nv v) : NormalForm v := by
+  -- this theorem always applies to arithmetic expressions, in any language
+  unfold NormalForm
+  -- by contradiction we suppose a tt such that v → tt exists
+  apply Classical.byContradiction
+  intro hcontra
+  simp only [not_exists, Classical.not_forall, Classical.not_not] at hcontra
+  obtain ⟨tt, htt⟩ := hcontra
+  exact absurd htt (NotNvEvalTo _ _ h) -- this is absurd!
+
+/- theorem 3.5.8 : If t is in normal form, then t is a value.
+  in this case we again need an inversion lemma, i.e., we can't derive
+  numeric values nv for elements that are not arithmetic ones.
+  TODO: is this actually an inversion lemma?
+-/
+
+theorem NFImpValue (v : t') : NormalForm v → nv v := by
+  sorry
