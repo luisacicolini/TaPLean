@@ -1,0 +1,1 @@
+In this repository I formalize the theorems and exercises from the book "Types and Programming Languages" by B. Pierce, summarizing a few of the concepts the book presents and commenting the exercises (to make sure I understand what Lean is doing).
