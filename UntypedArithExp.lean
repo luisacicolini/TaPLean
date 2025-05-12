@@ -6,45 +6,33 @@
   · if t₁, t₂, t₃ ∈ T then "if t₁ then t₂ else t₃" ∈ T
 -/
 
-/- Lean automatically indexes the levels of the types -/
-inductive newType : Type where
-  | ttrue : newType
-  | ffalse  : newType
-  | zero : newType
-  | pred (t : newType)  : newType
-  | isZero (t : newType) : newType
-  | ite  (t₁ t₂ t₃ : newType) : newType
+-- Untyped Booleans Language
 
-
-/- Lean generates a `sizeOf` automatically that knows the level `i` for a `tᵢ`: -/
-#reduce sizeOf newType.ttrue -- 1
-#reduce sizeOf newType.ffalse -- 1
-#reduce sizeOf (newType.isZero .ttrue) -- 2
-
-/-- Untyped Booleans -/
-
+-- terms
 inductive t where
   | True : t
   | False : t
   | ite : t → t → t → t
 
-#reduce sizeOf t.True -- 1
-#reduce sizeOf t.False -- 1
-#reduce sizeOf (t.ite t.True t.True t.False) -- 4
+-- values
+inductive tv : t → Prop where
+  | True : tv t.True
+  | False : tv t.False
 
-/- define the evaluation relation: in Lean we incode it as an  *inductive prooposition* -/
-
+-- evaluation, defined as an *inductive predicate*
 inductive t.EvaluatesTo : t → t → Prop
 | EvaluatesToTrue: t.EvaluatesTo (.ite .True l r) l
 | EvaluatesToFalse: t.EvaluatesTo (.ite .False l r) r
 | EvaluatesToIf (h : t.EvaluatesTo cd cd') : t.EvaluatesTo (.ite cd l r) (.ite cd' l r)
 
-open t
+#reduce sizeOf t.True -- 1
+#reduce sizeOf t.False -- 1
+#reduce sizeOf (t.ite t.True t.True t.False) -- 4
 
 /-
   theorem 3.5.4: determinacy of one-step evaluation
-    if t → t' and t → t'' then t' = t''
-  (note that we represent "→" as EvaluatesTo)
+  if t → t' and t → t'' then t' = t''
+  (note that '→' = 'EvaluatesTo')
 -/
 theorem OneStepDeterminacy (a b c : t) (hab : t.EvaluatesTo a b) (hac : t.EvaluatesTo a c) : b = c := by
   revert c -- need to generalize c to be able to use it afterwards in the inductive cases
@@ -69,6 +57,56 @@ theorem OneStepDeterminacy (a b c : t) (hab : t.EvaluatesTo a b) (hac : t.Evalua
       · case EvaluatesToIf tthen telse =>
           rw [ih]
           exact telse
+
+/- def 3.5.6 A term t is in normal form if no evaluation rule applies to it -/
+def NormalForm (tt : t) := ¬ ∃ tt', t.EvaluatesTo tt tt'
+
+/- theorem 3.5.7 : Every value is in normal form -/
+theorem ValueIsInNF (v : t) (h : tv v) : NormalForm v := by
+  -- note that this theorem always applies to arithmetic expressions, in any language (e.g. the next one)
+  unfold NormalForm
+  intro h' -- by contradiction, suppose ∃ tt such that v → tt
+  obtain ⟨tt, htt⟩ := h'
+  cases h -- by h, we know that v is eithet t.True or t.False, and no evaluation rule exists for these elements
+  <;> cases htt -- absurd
+
+/- theorem 3.5.8 : If t is in normal form, then t is a value -/
+theorem NFImpValue (v : t) : NormalForm v → tv v := by
+  unfold NormalForm
+  intro h
+  simp only [not_exists] at h
+  -- we suppose v is not a value
+  apply Classical.byContradiction
+  intro hcontra
+  -- then use  structural induction on v
+  induction v
+  · -- true is indeed a value!
+    case True =>
+    have : tv t.True := tv.True
+    contradiction
+  · case False =>
+    have : tv t.False := tv.False
+    contradiction
+  · case ite cd l r ihcd ihl ihr =>
+    -- the inductive hypothesis applies to each sub-term
+    cases cd
+    · -- can't be in normal form, since a rule applies!
+      case True =>
+      specialize h l -- if ∀ (x : t), ¬(t.True.ite l r).EvaluatesTo x, then we can specialize with x = l: ¬(t.True.ite l r).EvaluatesTo l
+      have := t.EvaluatesTo.EvaluatesToTrue (r := r) (l := l) -- however, this rules exists!
+      contradiction
+    · -- same as above
+      case False =>
+      specialize h r
+      have := t.EvaluatesTo.EvaluatesToFalse (r := r) (l := l)
+      contradiction
+    · -- v = ite cd l r, cd = ite cd' l' r', i.e., v = ite (ite cd' l' r') l r
+      -- cd is not a value and by the inductive hp it is also not nf, i.e., ∃ tt' : cd → tt'
+      -- however, if this is the case, then (v = ite cd l r) [EvaluatesToIf]→ (ite tt' l r) (this is the only viable rule!)
+      -- and t is thus not nf either
+      case ite cd' l' r'  =>
+      sorry
+
 
 /--  Untyped Booleans and Naturals: we introduce a new type t' which contains either elements from t (booleans) or natural numbers -/
 
@@ -368,26 +406,3 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
       -- iszero tt' = iszero tt'', we apply the inductive hypothesis
       case EvaluatesToIsZero tt'' httEvalTott' =>
       exact congrArg t'.iszero (ih tt'' httEvalTott')
-
-/- def 3.5.6 A term t is in normal form if no evaluation rule applies to it -/
-def NormalForm (tt : t') := ¬ ∃ tt', t'.EvaluatesTo tt tt'
-
-/- theorem 3.5.7 : Every value is in normal form -/
-theorem ValueIsInNF (v : t') (h : nv v) : NormalForm v := by
-  -- this theorem always applies to arithmetic expressions, in any language
-  unfold NormalForm
-  -- by contradiction we suppose a tt such that v → tt exists
-  apply Classical.byContradiction
-  intro hcontra
-  simp only [not_exists, Classical.not_forall, Classical.not_not] at hcontra
-  obtain ⟨tt, htt⟩ := hcontra
-  exact absurd htt (NotNvEvalTo _ _ h) -- this is absurd!
-
-/- theorem 3.5.8 : If t is in normal form, then t is a value.
-  in this case we again need an inversion lemma, i.e., we can't derive
-  numeric values nv for elements that are not arithmetic ones.
-  TODO: is this actually an inversion lemma?
--/
-
-theorem NFImpValue (v : t') : NormalForm v → nv v := by
-  sorry
