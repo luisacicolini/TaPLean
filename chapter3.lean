@@ -8,7 +8,7 @@
   def 2.
   we give an *inductive definition* of a set of terms:
   the set of terms is the smallest set `T`s.t.
-    · {true, false} ⊆ T
+    · {true, false, 0} ⊆ T
     · if t₁ ∈ T then {succ t₁, pred t₁, iszero t₁} ⊆ T
     · if t₁, t₂, t₃ ∈ T then ite t₁ t₂ t₃ ⊆ T
 
@@ -37,6 +37,51 @@
                 ∪ {succ t₁, pred t₁, iszero t₁ | t₁ ∈ Si}
                 ∪ { ite t₁ t₂ t₃ | t₁, t₂ t₃ ∈ Si}
     and S = ∪i Si
+
+    because of the fundamental difference between set theory and type theory, it's very hard to
+    reason about sets in Lean.
+
+    def 5.
+    there are different types of induction proofs for natural numbers:
+    · *complete induction*
+      given a predicate P on Nat,
+        if given P(i) for all i < n we can show P(n),
+      then P(n) holds ∀ n
+    · *ordinary induction*
+      given a predicate on Nat,
+        if P(0) and ∀i, P(i) → P(i+1)
+      then P(n) holds ∀ n
+    · *lexicographic induction*
+      given a predicate on Nat × Nat,
+        if ∀ (m,n) ∈ Nat, given ∀ (m',n') < (m,n), P(m',n') we can show P(m,n)
+      then P(m,n) holds ∀ m,n
+
+    def 6.
+    we can define induction on terms as well:
+    · *induction on depth*
+      if ∀ s
+        given P(r) ∀ r s.t. depth(r) < depth(s) we can show P(s)
+      then P(s) holds ∀ s
+    · *induction on size*
+      if ∀ s
+        given P(r) ∀ r s.t. size(r) < size(s) we can show P(s)
+      then P(s) holds ∀ s
+    · *structural induction*
+      if ∀ s
+        given P(r) ∀ immediate subterms r of s we can show P(s)
+      then P(s) holds ∀ s
+
+    def 7.
+    we can define semantics in different ways:
+    · *operational semantics*
+        specifies the behavior of a program by building
+        an abstract machine for it states/transitions
+    · *denotational semantics*
+        the meaning of a term is a mathematical object,
+        this model thus requires defining the program's semantic domains and
+        an interpretation function
+    · *axiomatic semantics*
+        the meaning of a term is what can be proven about it
 -/
 
 -- Untyped Booleans Language
@@ -62,12 +107,6 @@ inductive t.EvaluatesTo : t → t → Prop
 #reduce sizeOf t.False -- 1
 #reduce sizeOf (t.ite t.True t.True t.False) -- 4
 
-
--- let's reason about the concrete definitions:
-
-inductive tconcrete : Nat → Prop where
-  | zero :
-  | succ i : sorry
 
 /-
   theorem 3.5.4: determinacy of one-step evaluation
@@ -98,7 +137,9 @@ theorem OneStepDeterminacy (a b c : t) (hab : t.EvaluatesTo a b) (hac : t.Evalua
           rw [ih]
           exact telse
 
-/- def 3.5.6 A term t is in normal form if no evaluation rule applies to it -/
+/- def 8.
+   a term t is in normal form if no evaluation rule applies to it
+-/
 def NormalForm (tt : t) := ¬ ∃ tt', t.EvaluatesTo tt tt'
 
 /- theorem 3.5.7 : Every value is in normal form -/
@@ -120,7 +161,6 @@ theorem ValueIsInNF (v : t) (h : tv v) : NormalForm v := by
 
 /- theorem 3.5.8 : If t is in normal form, then t is a value -/
 theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
-  apply Classical.byContradiction
   intro hcontra
   induction v
   · -- true is indeed a value!
