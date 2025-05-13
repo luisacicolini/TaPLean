@@ -71,20 +71,17 @@ theorem ValueIsInNF (v : t) (h : tv v) : NormalForm v := by
   <;> cases htt -- absurd
 
 /- theorem 3.5.8 : If t is in normal form, then t is a value -/
-theorem NFImpValue (v : t) : NormalForm v → tv v := by
-  unfold NormalForm
-  intro h
-  simp only [not_exists] at h
-  -- we suppose v is not a value
+theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
   apply Classical.byContradiction
   intro hcontra
-  -- then use  structural induction on v
   induction v
   · -- true is indeed a value!
     case True =>
+    unfold NormalForm at h
     have : tv t.True := tv.True
     contradiction
   · case False =>
+    unfold NormalForm at h
     have : tv t.False := tv.False
     contradiction
   · case ite cd l r ihcd ihl ihr =>
@@ -92,11 +89,15 @@ theorem NFImpValue (v : t) : NormalForm v → tv v := by
     cases cd
     · -- can't be in normal form, since a rule applies!
       case True =>
+      unfold NormalForm at h
+      simp only [not_exists] at h
       specialize h l -- if ∀ (x : t), ¬(t.True.ite l r).EvaluatesTo x, then we can specialize with x = l: ¬(t.True.ite l r).EvaluatesTo l
       have := t.EvaluatesTo.EvaluatesToTrue (r := r) (l := l) -- however, this rules exists!
       contradiction
     · -- same as above
       case False =>
+      unfold NormalForm at h
+      simp only [not_exists] at h
       specialize h r
       have := t.EvaluatesTo.EvaluatesToFalse (r := r) (l := l)
       contradiction
@@ -104,7 +105,8 @@ theorem NFImpValue (v : t) : NormalForm v → tv v := by
       -- cd is not a value and by the inductive hp it is also not nf, i.e., ∃ tt' : cd → tt'
       -- however, if this is the case, then (v = ite cd l r) [EvaluatesToIf]→ (ite tt' l r) (this is the only viable rule!)
       -- and t is thus not nf either
-      case ite cd' l' r'  =>
+      case ite cd' l' r' =>
+      simp only [imp_false, Classical.not_not] at ihcd
       sorry
 
 
@@ -146,9 +148,8 @@ inductive t'.EvaluatesTo : t' → t' → Prop
 | -- (tt → tt') → (iszero tt → iszero tt')
   EvaluatesToIsZero (h : t'.EvaluatesTo tt tt') : t'.EvaluatesTo (t'.iszero tt) (t'.iszero tt')
 
--- Q: what's the diff between doing cases on an inductive type vs. induction
-
-/-- A perspective on inductive predicates and relations based on set theory, from https://link.springer.com/chapter/10.1007/3-540-61780-9_64
+/-- Excursus on inductive predicates and relations based on a set-theory-perspective,
+  from https://link.springer.com/chapter/10.1007/3-540-61780-9_64
 
   Inductive definitions of sets rely on *constructors*: an element belongs to the set inductively
   defined iff it has been generated according to the rules.
