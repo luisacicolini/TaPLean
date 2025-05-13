@@ -1,9 +1,42 @@
-/--
-  Inductive definition of terms:
-  The set of terms T contains:
-  · {true, false, 0}
-  · if t₁ ∈ T then {succ t₁, pred t₁, iszero t₁} ⊆ T
-  · if t₁, t₂, t₃ ∈ T then "if t₁ then t₂ else t₃" ∈ T
+/-
+  def 1.
+  a *BNF grammar* is based on three sets:
+    · terminals: exactly match the input character
+    · non terminals: sets of strings
+    · rules: define relations between strings and monterminals
+
+  def 2.
+  we give an *inductive definition* of a set of terms:
+  the set of terms is the smallest set `T`s.t.
+    · {true, false} ⊆ T
+    · if t₁ ∈ T then {succ t₁, pred t₁, iszero t₁} ⊆ T
+    · if t₁, t₂, t₃ ∈ T then ite t₁ t₂ t₃ ⊆ T
+
+
+  def 3.
+  we can define the same set starting from the *inference rules*, where:
+  axioms:
+    · true ∈ T
+    · false ∈ T
+    · 0 ∈ T
+  rules:
+      t₁ ∈ T          t₁ ∈ T            t₁ ∈ T
+    -----------     -----------     -------------
+    succ t₁ ∈ T     pred t₁ ∈ T     iszero t₁ ∈ T
+
+              t₁ ∈ T  t₂ ∈ T  t₃ ∈ T
+              ----------------------
+                 ite t₁ t₂ t₃ ∈ T
+    these rules say that if we can establish the upper terms, we can derive the lower term.
+
+    def 4.
+    we can give a *concrete definition* of terms:
+    for each natural number `i`, define a set Si:
+      S₀ = ∅
+      S (i+1) = {true, false, 0}
+                ∪ {succ t₁, pred t₁, iszero t₁ | t₁ ∈ Si}
+                ∪ { ite t₁ t₂ t₃ | t₁, t₂ t₃ ∈ Si}
+    and S = ∪i Si
 -/
 
 -- Untyped Booleans Language
@@ -21,13 +54,20 @@ inductive tv : t → Prop where
 
 -- evaluation, defined as an *inductive predicate*
 inductive t.EvaluatesTo : t → t → Prop
-| EvaluatesToTrue: t.EvaluatesTo (.ite .True l r) l
-| EvaluatesToFalse: t.EvaluatesTo (.ite .False l r) r
-| EvaluatesToIf (h : t.EvaluatesTo cd cd') : t.EvaluatesTo (.ite cd l r) (.ite cd' l r)
+  | EvaluatesToTrue: t.EvaluatesTo (.ite .True l r) l
+  | EvaluatesToFalse: t.EvaluatesTo (.ite .False l r) r
+  | EvaluatesToIf (h : t.EvaluatesTo cd cd') : t.EvaluatesTo (.ite cd l r) (.ite cd' l r)
 
 #reduce sizeOf t.True -- 1
 #reduce sizeOf t.False -- 1
 #reduce sizeOf (t.ite t.True t.True t.False) -- 4
+
+
+-- let's reason about the concrete definitions:
+
+inductive tconcrete : Nat → Prop where
+  | zero :
+  | succ i : sorry
 
 /-
   theorem 3.5.4: determinacy of one-step evaluation
@@ -70,6 +110,14 @@ theorem ValueIsInNF (v : t) (h : tv v) : NormalForm v := by
   cases h -- by h, we know that v is eithet t.True or t.False, and no evaluation rule exists for these elements
   <;> cases htt -- absurd
 
+/--
+  Recall the principle of structural induction:
+  if for each term `s`
+    given `P(r)` for each subterm `r` of `s` we can show `P(s)`
+  then `P(s)` holds for all `s`.
+-/
+
+
 /- theorem 3.5.8 : If t is in normal form, then t is a value -/
 theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
   apply Classical.byContradiction
@@ -107,6 +155,7 @@ theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
       -- and t is thus not nf either
       case ite cd' l' r' =>
       simp only [imp_false, Classical.not_not] at ihcd
+
       sorry
 
 
