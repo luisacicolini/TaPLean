@@ -220,6 +220,10 @@ inductive t' where
   | iszero : t' → t'
   deriving Repr
 
+inductive tv' : t' → Prop where
+  | True : tv' t'.True
+  | False : tv' t'.False
+
 inductive nv : t' → Prop where
   | zero : nv t'.zero
   | succ n : nv n → nv (t'.succ n)
@@ -504,3 +508,71 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
       -- iszero tt' = iszero tt'', we apply the inductive hypothesis
       case EvaluatesToIsZero tt'' httEvalTott' =>
       exact congrArg t'.iszero (ih tt'' httEvalTott')
+
+/- def 3.5.9 a closed term is *stuck* if it is in normal form, but not a value -/
+
+def isStuck (v : t') := nv v ∧ (¬ tv' v) ∧ (¬ nv v)
+
+/- 3.5.16: we enrich the semantics with a new term `wrong`, to formalize meaningless states and
+  introduce rules that generate this term every time the semantics gets stuck. -/
+
+inductive t'' where
+  | True : t''
+  | False : t''
+  | ite : t'' → t'' → t'' → t''
+  | zero : t''
+  | succ : t'' → t''
+  | pred : t'' → t''
+  | iszero : t'' → t''
+  | wrong : t''
+  deriving Repr
+
+-- values
+inductive tv'' : t'' → Prop where
+  | True : tv'' t''.True
+  | False : tv'' t''.False
+
+inductive nv'' : t'' → Prop where
+  | zero : nv'' (t''.zero)
+  | succ n : nv'' n → nv'' (t''.succ n)
+
+inductive badNat : t'' → Prop where
+  | wrong : badNat wrong
+  | badTrue : badNat t''.True
+  | badFalse : badNat t''.False
+
+
+inductive badBool : t'' →  Prop  where
+  | wrong : badBool wrong
+  | badBoolZero : badBool t''.zero
+  | badBoolNv : badBool n → badBool (t''.succ n)
+
+inductive t''.AugmentedEvaluatesTo : t'' → t'' → Prop
+| -- ite true l r → l
+  EvaluatesToTrue {l r : t''} : t''.AugmentedEvaluatesTo (True.ite l r) l
+| -- ite false l r → r
+  EvaluatesToFalse {l r : t''} : t''.AugmentedEvaluatesTo (False.ite l r) r
+| -- (cd → cd') → (ite cd l r → ite cd' l r)
+  EvaluatesToIf (h : t''.AugmentedEvaluatesTo cd cd') : t''.AugmentedEvaluatesTo (cd.ite l r) (cd'.ite l r)
+| -- (v → v') → (succ v → succ v')
+  EvaluatesToSucc {v v' : t''} (h : AugmentedEvaluatesTo v v') : (AugmentedEvaluatesTo (t''.succ v) (t''.succ v'))
+| -- pred 0 = 0
+  EvaluatesToZero : t''.AugmentedEvaluatesTo (t''.pred t''.zero) (t''.zero)
+| -- pred (succ nv) → nv
+  EvaluatesToPredSucc (h : nv'' v) : t''.AugmentedEvaluatesTo (t''.pred (t''.succ v))  (v)
+| -- (v → v') → (pred v → pred v')
+  EvaluatesToPred (h : t''.AugmentedEvaluatesTo v v') : t''.AugmentedEvaluatesTo (t''.pred v) (t''.pred v')
+| -- iszero 0 → true
+  EvaluatesToIsZeroZero : t''.AugmentedEvaluatesTo (t''.iszero t''.zero) (t''.True)
+| -- iszero (succ nv) → false
+  EvaluatesToIsZeroSucc (h : nv'' v) : t''.AugmentedEvaluatesTo (t''.iszero (t''.succ v)) (t''.False)
+| -- (tt → tt') → (iszero tt → iszero tt')
+  EvaluatesToIsZero (h : t''.AugmentedEvaluatesTo tt tt') : t''.AugmentedEvaluatesTo (t''.iszero tt) (t''.iszero tt')
+|-- ite badBool l r → wrong
+  EvaluatesToIfWrong (h : badBool cd) : t''.AugmentedEvaluatesTo (cd.ite l r) t''.wrong
+| -- succ badNat → wrong
+  EvaluatesToSuccWrong (h : badNat tt) : t''.AugmentedEvaluatesTo (succ tt) t''.wrong
+| -- pred badNat → wrong
+  EvaluatesToPredWrong (h : badNat tt) : t''.AugmentedEvaluatesTo (pred tt) t''.wrong
+| -- iszero badNat → wrong
+  EvaluatesToIsZeroWrong (h : badNat tt) : t''.AugmentedEvaluatesTo (t''.iszero tt) t''.wrong
