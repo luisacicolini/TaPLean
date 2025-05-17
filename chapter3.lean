@@ -196,6 +196,17 @@ theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
       have := t.EvaluatesTo.EvaluatesToIf (cd := cd'.ite l' r') (cd' := x) (l := l) (r := r)
       simp_all only [imp_false, not_true_eq_false]
 
+/- 3.5.13: if we add a new rule things could go wild and the theorems might stop holding. -/
+
+inductive t.FunnyEvaluatesTo : t → t → Prop
+  | EvaluatesToTrue: t.FunnyEvaluatesTo (.ite .True l r) l
+  | EvaluatesToFalse: t.FunnyEvaluatesTo (.ite .False l r) r
+  | EvaluatesToIf : (h : t.FunnyEvaluatesTo cd cd') → t.FunnyEvaluatesTo (.ite cd l r) (.ite cd' l r)
+  | EvaluatesToFunny : t.FunnyEvaluatesTo (.ite .True l r) r
+
+-- one expression can evaluate to two different expressions
+theorem funnyEval₁ : (t.True.ite l r).FunnyEvaluatesTo l := t.FunnyEvaluatesTo.EvaluatesToTrue (l := l) (r := r)
+theorem funnyEval₂ : (t.True.ite l r).FunnyEvaluatesTo r := t.FunnyEvaluatesTo.EvaluatesToFunny (l := l) (r := r)
 
 /--  Untyped Booleans and Naturals: we introduce a new type t' which contains either elements from t (booleans) or natural numbers -/
 
@@ -318,7 +329,6 @@ theorem NotNvEvalTo (v t : t') (n : nv v) : ¬ t'.EvaluatesTo v t := by
       -- we need to prove that the inductive hypothesis still holds: ¬ v' → (succ t₁')
       -- we apply the inductive hypothesis ¬v'.EvaluatesTo t with t = t₁' and given the evaluation in h.
       exact ihn t₁' h
-
 
 theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.EvaluatesTo a c) : b = c := by
   -- we use induction on the derivation rule hab
