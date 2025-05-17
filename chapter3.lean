@@ -161,7 +161,7 @@ theorem IteNotTv {cd l r : t} : ¬ tv (t.ite cd l r) := by
   intro h; cases h
 
 /- theorem 3.5.8 : If t is in normal form, then t is a value -/
-; theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
+theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
   induction v
   · -- true is indeed a value!
     case True => exact tv.True
