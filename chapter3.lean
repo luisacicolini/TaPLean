@@ -101,12 +101,11 @@ inductive tv : t → Prop where
 inductive t.EvaluatesTo : t → t → Prop
   | EvaluatesToTrue: t.EvaluatesTo (.ite .True l r) l
   | EvaluatesToFalse: t.EvaluatesTo (.ite .False l r) r
-  | EvaluatesToIf (h : t.EvaluatesTo cd cd') : t.EvaluatesTo (.ite cd l r) (.ite cd' l r)
+  | EvaluatesToIf : (h : t.EvaluatesTo cd cd') → t.EvaluatesTo (.ite cd l r) (.ite cd' l r)
 
 #reduce sizeOf t.True -- 1
 #reduce sizeOf t.False -- 1
 #reduce sizeOf (t.ite t.True t.True t.False) -- 4
-
 
 /-
   theorem 3.5.4: determinacy of one-step evaluation
@@ -158,22 +157,18 @@ theorem ValueIsInNF (v : t) (h : tv v) : NormalForm v := by
   then `P(s)` holds for all `s`.
 -/
 
+theorem IteNotTv {cd l r : t} : ¬ tv (t.ite cd l r) := by
+  intro h; cases h
 
 /- theorem 3.5.8 : If t is in normal form, then t is a value -/
-theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
-  intro hcontra
+; theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
   induction v
   · -- true is indeed a value!
-    case True =>
-    unfold NormalForm at h
-    have : tv t.True := tv.True
-    contradiction
-  · case False =>
-    unfold NormalForm at h
-    have : tv t.False := tv.False
-    contradiction
+    case True => exact tv.True
+  · case False => exact tv.False
   · case ite cd l r ihcd ihl ihr =>
     -- the inductive hypothesis applies to each sub-term
+    have hiteNotTv := IteNotTv (cd := cd) (l := l) (r := r)
     cases cd
     · -- can't be in normal form, since a rule applies!
       case True =>
@@ -194,9 +189,12 @@ theorem NFImpValue (v : t) (h : NormalForm v) : tv v := by
       -- however, if this is the case, then (v = ite cd l r) [EvaluatesToIf]→ (ite tt' l r) (this is the only viable rule!)
       -- and t is thus not nf either
       case ite cd' l' r' =>
-      simp only [imp_false, Classical.not_not] at ihcd
-
-      sorry
+      have hIteNotTv' := IteNotTv (cd := cd') (l := l') (r := r')
+      simp only [NormalForm, not_exists, hIteNotTv', imp_false, Classical.not_forall,
+        Classical.not_not] at ihcd h
+      obtain ⟨x, hx⟩ := ihcd
+      have := t.EvaluatesTo.EvaluatesToIf (cd := cd'.ite l' r') (cd' := x) (l := l) (r := r)
+      simp_all only [imp_false, not_true_eq_false]
 
 
 /--  Untyped Booleans and Naturals: we introduce a new type t' which contains either elements from t (booleans) or natural numbers -/
