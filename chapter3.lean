@@ -224,9 +224,9 @@ inductive tv' : t' → Prop where
   | True : tv' t'.True
   | False : tv' t'.False
 
-inductive nv : t' → Prop where
-  | zero : nv t'.zero
-  | succ n : nv n → nv (t'.succ n)
+inductive nv' : t' → Prop where
+  | zero : nv' t'.zero
+  | succ n : nv' n → nv' (t'.succ n)
 
 inductive t'.EvaluatesTo : t' → t' → Prop
 | -- ite true l r → l
@@ -240,13 +240,13 @@ inductive t'.EvaluatesTo : t' → t' → Prop
 | -- pred 0 = 0
   EvaluatesToZero : t'.EvaluatesTo (t'.pred t'.zero) (t'.zero)
 | -- pred (succ nv) → nv
-  EvaluatesToPredSucc (h : nv v) : t'.EvaluatesTo (t'.pred (t'.succ v))  (v)
+  EvaluatesToPredSucc (h : nv' v) : t'.EvaluatesTo (t'.pred (t'.succ v))  (v)
 | -- (v → v') → (pred v → pred v')
   EvaluatesToPred (h : t'.EvaluatesTo v v') : t'.EvaluatesTo (t'.pred v) (t'.pred v')
 | -- iszero 0 → true
   EvaluatesToIsZeroZero : t'.EvaluatesTo (t'.iszero t'.zero) (t'.True)
 | -- iszero (succ nv) → false
-  EvaluatesToIsZeroSucc (h : nv v) : t'.EvaluatesTo (t'.iszero (t'.succ v)) (t'.False)
+  EvaluatesToIsZeroSucc (h : nv' v) : t'.EvaluatesTo (t'.iszero (t'.succ v)) (t'.False)
 | -- (tt → tt') → (iszero tt → iszero tt')
   EvaluatesToIsZero (h : t'.EvaluatesTo tt tt') : t'.EvaluatesTo (t'.iszero tt) (t'.iszero tt')
 
@@ -317,7 +317,7 @@ theorem NotZeroEvalTo (t : t') : ¬ t'.EvaluatesTo t'.zero t := by
   cases h -- then we evaluate the cases by which this hypothesi can be true: none!
 
 -- it is not true that a v : t' such that ∃ n : nv v can evaluate to a generic t
-theorem NotNvEvalTo (v t : t') (n : nv v) : ¬ t'.EvaluatesTo v t := by
+theorem NotNvEvalTo (v t : t') (n : nv' v) : ¬ t'.EvaluatesTo v t := by
   induction n generalizing t
   · -- n = nv t'.zero, v' = t'.zero
     case zero => exact NotZeroEvalTo t
@@ -424,7 +424,7 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
       case EvaluatesToPred v' hvEvalTov' =>
       -- we construct the numerical value of succ v
       -- using the constructors of nv, v and its numerical value
-      have hNv' : nv (t'.succ v) := nv.succ v hNv
+      have hNv' : nv' (t'.succ v) := nv'.succ v hNv
       -- and we exploit the fact that the numerical value can not be evaluated to anything
       exact absurd hvEvalTov' (NotNvEvalTo _ _ hNv')
   · -- a [EvaluatesToPred] → b
@@ -443,7 +443,7 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
       -- pred v' = c
       case EvaluatesToPredSucc hNv'' =>
       -- we use the constructor of nv to
-      have hNv'' : nv (t'.succ c) := nv.succ c hNv''
+      have hNv'' : nv' (t'.succ c) := nv'.succ c hNv''
       -- no evaluation rule applies to numerical values, i.e., hvEvalTov' yields an absurd
       -- given the construction of hNV''
       exact absurd hvEvalTov' (NotNvEvalTo _ _ hNv'')
@@ -478,7 +478,7 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
       -- false = iszero v''
       case EvaluatesToIsZero v'' hvsuccEvalTov'' =>
       -- we construct the numerical value of succ v
-      have hNvSucc : nv (t'.succ v) := nv.succ v hNv
+      have hNvSucc : nv' (t'.succ v) := nv'.succ v hNv
       -- and we show that the derivation (succ v) → v'' is absurd, since
       exact absurd hvsuccEvalTov'' (NotNvEvalTo _ _ hNvSucc)
   · -- a [EvaluatesToIsZero]→ b
@@ -498,7 +498,7 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
       -- and in particular succ v → tt'
       case EvaluatesToIsZeroSucc v hNv =>
       -- we construct the numerical value for succ v
-      have hNvSucc : nv (t'.succ v) := nv.succ v hNv
+      have hNvSucc : nv' (t'.succ v) := nv'.succ v hNv
       -- hypothesis httEvalTott' is absurd, since it supposes succ v → tt'
       exact absurd httEvalTott' (NotNvEvalTo _ _ hNvSucc)
     · -- a [EvaluatesToIsZero]→ c
@@ -511,7 +511,10 @@ theorem OneStepDeterminacy' (a b c : t') (hab : t'.EvaluatesTo a b) (hac : t'.Ev
 
 /- def 3.5.9 a closed term is *stuck* if it is in normal form, but not a value -/
 
-def isStuck (v : t') := nv v ∧ (¬ tv' v) ∧ (¬ nv v)
+def NormalForm' (tt : t') := ¬ ∃ tt', t'.EvaluatesTo tt tt'
+
+def isStuck' (v : t') := (¬ nv' v) ∧ (¬ tv' v) ∧ NormalForm' v
+
 
 /- 3.5.16: we enrich the semantics with a new term `wrong`, to formalize meaningless states and
   introduce rules that generate this term every time the semantics gets stuck. -/
@@ -541,11 +544,10 @@ inductive badNat : t'' → Prop where
   | badTrue : badNat t''.True
   | badFalse : badNat t''.False
 
-
 inductive badBool : t'' →  Prop  where
-  | wrong : badBool wrong
+  | wrong : badBool t''.wrong
   | badBoolZero : badBool t''.zero
-  | badBoolNv : badBool n → badBool (t''.succ n)
+  | badBoolNv n : badBool n → badBool (t''.succ n)
 
 inductive t''.AugmentedEvaluatesTo : t'' → t'' → Prop
 | -- ite true l r → l
@@ -576,3 +578,179 @@ inductive t''.AugmentedEvaluatesTo : t'' → t'' → Prop
   EvaluatesToPredWrong (h : badNat tt) : t''.AugmentedEvaluatesTo (pred tt) t''.wrong
 | -- iszero badNat → wrong
   EvaluatesToIsZeroWrong (h : badNat tt) : t''.AugmentedEvaluatesTo (t''.iszero tt) t''.wrong
+
+/-- Given that we can't mix different types in the same theorem, we first define a mapping from t' to t'' -/
+def map (e : t') : t'' :=
+  match e with
+  | t'.True => t''.True
+  | t'.False => t''.False
+  | t'.ite cnd lhs rhs => t''.ite (map cnd) (map lhs) (map rhs)
+  | t'.zero => t''.zero
+  | t'.pred n => t''.pred (map n)
+  | t'.succ n => t''.succ (map n)
+  | t'.iszero n => t''.iszero (map n)
+
+@[simp]
+def ElimOftvTrue {C : Sort u} (h : ¬ tv' t'.True) : C := by
+  have : tv' t'.True := by constructor
+  contradiction
+
+@[simp]
+def ElimOftvFalse {C : Sort u} (h : ¬ tv' t'.False) : C := by
+  have : tv' t'.False := by constructor
+  contradiction
+
+@[simp]
+def ElimOfnvZero {C : Sort u} (h : ¬ nv' t'.zero) : C := by
+  have : nv' t'.zero := by constructor
+  contradiction
+
+-- it is not true that given any t: wrong → t
+theorem NotWrongEvalTo (t : t'') : ¬ t''.AugmentedEvaluatesTo t''.wrong t := by
+  intro h -- suppose by hp. we have t''.AugmentedEvaluatesTo t''.wrong t
+  cases h -- then we evaluate the cases by which this hypothesis can be true: none!
+
+/-- We first prove the one-step determinacy of AugmentedEvaluatesTo, which will be useful to prove the subsequent lemma -/
+theorem OneStepDeterminacyAugmented (a b c : t'') (hab : t''.AugmentedEvaluatesTo a b) (hac : t''.AugmentedEvaluatesTo a c) : b = c := by
+  induction hab generalizing c
+  · case EvaluatesToTrue lhs rhs =>
+    cases hac
+    · case EvaluatesToTrue => rfl
+    · case EvaluatesToIf lhs' ihl' => cases ihl'
+    · case EvaluatesToIfWrong hbad => cases hbad -- True is not a badBool!
+  · case EvaluatesToFalse lhs rhs =>
+    cases hac
+    · case EvaluatesToFalse => rfl
+    · case EvaluatesToIf lhs' ihl' => cases ihl'
+    · case EvaluatesToIfWrong hbad => cases hbad -- False is not a badBool!
+  · case EvaluatesToIf cond lhs rhs ihc ihl ihr =>
+    cases hac
+    · case EvaluatesToTrue => cases ihl -- True does not evaluate to anything
+    · case EvaluatesToFalse => cases ihl -- False does not evaluate to anything
+    · case EvaluatesToIf cond' ihc' =>
+      specialize ihr cond'
+      exact congrFun (congrFun (congrArg t''.ite (ihr ihc')) rhs) ihc
+    · case EvaluatesToIfWrong hbad =>
+      cases hbad
+      · case wrong => cases ihl -- wrong can't evaluate to anything
+      · case badBoolZero => cases ihl -- zero can't evaluate to anything
+      · case badBoolNv bad hbad =>
+        cases bad
+        · case True => cases hbad
+        · case False => cases hbad
+        · case ite cond' lhs' rhs' => cases hbad
+        · case zero =>
+          cases ihl
+          · case EvaluatesToSucc e heval  => cases heval
+          · case EvaluatesToSuccWrong hbadnat =>
+            cases hbadnat
+            · case wrong =>
+              specialize ihr t''.zero.succ
+              simp at ihr
+
+              sorry
+        · case succ s => sorry
+        · case pred s => sorry
+        · case iszero s => sorry
+        · case wrong => sorry
+  · case EvaluatesToSucc s r ihs ihr => sorry
+  · case EvaluatesToZero => sorry
+  · case EvaluatesToPredSucc s ihs => sorry
+  · case EvaluatesToPred s r ihs ihr => sorry
+  · case EvaluatesToIsZeroZero => sorry
+  · case EvaluatesToIsZeroSucc s ihs => sorry
+  · case EvaluatesToIsZero s ihs r ihr => sorry
+  · case EvaluatesToIfWrong s ihs r ihs => sorry
+  · case EvaluatesToSuccWrong s ihs => sorry
+  · case EvaluatesToPredWrong s ihs => sorry
+  · case EvaluatesToIsZeroWrong s ihs => sorry
+
+/-- Then we prove that the augmented evaluations in t'' correspond to the def. of `stuck` in t' -/
+theorem stuck_iff (g : t'):
+    ((t''.AugmentedEvaluatesTo (map g) (t''.wrong))) ↔ (isStuck' g) := by
+  induction g
+  · case True =>
+    simp [map]
+    constructor
+    · intro h; cases h
+    · intro h
+      obtain ⟨h1, h2, h3⟩ := h
+      apply ElimOftvTrue h2
+  · case False =>
+    simp [map]
+    constructor
+    · intro h; cases h
+    · intro h
+      obtain ⟨h1, h2, h3⟩ := h
+      apply ElimOftvFalse h2
+  · case ite cnd lhs rhs ihc ihl ihr =>
+    cases cnd
+    · case True =>
+      simp [map] at ihc ⊢
+      simp [isStuck'] at ihc
+      constructor
+      · intro h
+        cases h
+
+        sorry
+      · intro h
+        sorry
+    · case False => sorry
+    · case ite cnd' lhs' rhs' => sorry
+    · case zero => sorry
+    · case succ s => sorry
+    · case pred s => sorry
+    · case iszero s => sorry
+
+
+
+
+
+
+
+
+
+
+  · intro haug
+    cases g
+    · case True =>
+        unfold map at haug
+        cases haug
+    · case False =>
+        unfold map at haug
+        cases haug
+    · case ite cnd lhs rhs =>
+        unfold map at haug
+        unfold isStuck' NormalForm'
+        cases cnd
+        · case True =>
+          have hexists : t'.EvaluatesTo (t'.ite t'.True lhs rhs) lhs := t'.EvaluatesTo.EvaluatesToTrue
+          have : ¬ ∀ (x : t'), ¬(t'.True.ite lhs rhs).EvaluatesTo x := by
+            simp only [Classical.not_forall, Classical.not_not]
+            exists lhs
+          simp at this
+          simp [map] at haug
+          have hexistsaug : t''.AugmentedEvaluatesTo (t''.ite t''.True (map lhs) (map rhs)) (map lhs) := t''.AugmentedEvaluatesTo.EvaluatesToTrue
+          cases lhs <;> cases rhs
+          · simp [map] at haug hexistsaug
+            simp [this]
+            cases haug
+            · case True.True.EvaluatesToIfWrong hbad => rcases hbad
+
+
+
+          sorry
+        sorry
+    · case zero =>
+        unfold map at haug
+        cases haug
+    · case succ n =>
+        unfold map at haug
+        cases haug
+    · case pred n =>
+        unfold map at haug
+        cases haug
+    · case iszero n =>
+        unfold map at haug
+        cases haug
+  · sorry
