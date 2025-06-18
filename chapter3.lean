@@ -540,7 +540,7 @@ inductive nv'' : t'' → Prop where
   | succ n : nv'' n → nv'' (t''.succ n)
 
 inductive badNat : t'' → Prop where
-  | wrong : badNat wrong
+  | wrong : badNat t''.wrong
   | badTrue : badNat t''.True
   | badFalse : badNat t''.False
 
@@ -623,36 +623,46 @@ theorem OneStepDeterminacyAugmented (a b c : t'') (hab : t''.AugmentedEvaluatesT
     · case EvaluatesToFalse => rfl
     · case EvaluatesToIf lhs' ihl' => cases ihl'
     · case EvaluatesToIfWrong hbad => cases hbad -- False is not a badBool!
-  · case EvaluatesToIf cond lhs rhs ihc ihl ihr =>
+  · -- a [EvaluatesToIf]→ b
+    case EvaluatesToIf cond cond' lhs rhs ihl ihr =>
     cases hac
     · case EvaluatesToTrue => cases ihl -- True does not evaluate to anything
     · case EvaluatesToFalse => cases ihl -- False does not evaluate to anything
-    · case EvaluatesToIf cond' ihc' =>
-      specialize ihr cond'
-      exact congrFun (congrFun (congrArg t''.ite (ihr ihc')) rhs) ihc
-    · case EvaluatesToIfWrong hbad =>
+    · case EvaluatesToIf cond'' ihc' =>
+      specialize ihr cond''
+      exact congrFun (congrFun (congrArg t''.ite (ihr ihc')) lhs) rhs
+    · -- a [EvaluatesToIfWrong]→ c
+      case EvaluatesToIfWrong hbad =>
+      -- we want to show that if a = wrong then a [EvaluatesToIf]→ b is a contradiction
       cases hbad
-      · case wrong => cases ihl -- wrong can't evaluate to anything
-      · case badBoolZero => cases ihl -- zero can't evaluate to anything
+      · case wrong => cases ihl
+      · case badBoolZero => cases ihl
       · case badBoolNv bad hbad =>
-        cases bad
-        · case True => cases hbad
-        · case False => cases hbad
-        · case ite cond' lhs' rhs' => cases hbad
-        · case zero =>
+        cases hbad
+        · case wrong =>
           cases ihl
-          · case EvaluatesToSucc e heval  => cases heval
-          · case EvaluatesToSuccWrong hbadnat =>
-            cases hbadnat
-            · case wrong =>
-              specialize ihr t''.zero.succ
-              simp at ihr
+          · case EvaluatesToSucc h h' => cases h'
+          · case EvaluatesToSuccWrong h' =>
+            specialize ihr (t''.wrong.ite lhs rhs)
+            apply Eq.symm
 
-              sorry
-        · case succ s => sorry
-        · case pred s => sorry
-        · case iszero s => sorry
-        · case wrong => sorry
+            sorry
+        · case badBoolZero =>
+          cases ihl
+          · case EvaluatesToSucc h h' => cases h'
+          · case EvaluatesToSuccWrong h' =>
+            specialize ihr (t''.wrong.ite lhs rhs)
+            apply Eq.symm
+            apply ihr
+            sorry
+        · case badBoolNv =>
+          cases ihl
+          · case EvaluatesToSucc h h' => sorry
+          · case EvaluatesToSuccWrong h' =>
+            specialize ihr (t''.wrong.ite lhs rhs)
+            apply Eq.symm
+            apply ihr
+            sorry
   · case EvaluatesToSucc s r ihs ihr => sorry
   · case EvaluatesToZero => sorry
   · case EvaluatesToPredSucc s ihs => sorry
